@@ -549,6 +549,8 @@ const GameWorld = {
     padAt(x, y, z) { for (const p of this.pads) if (Math.hypot(x - p.x, z - p.z) < p.r && Math.abs(y - p.y) < 160) return p; return null; },
     winAt(x, y, z) { for (const w of this.wins) if (Math.hypot(x - w.x, z - w.z) < w.r && y - w.y > -60 && y - w.y < 260) return w; return null; },
     portalAt(x, y, z) { for (const p of this.portals) if (Math.hypot(x - p.x, z - p.z) < p.r && Math.abs(y - p.y) < 220) return p; return null; },
+    /** Пьедестал с руками-витриной под героем (встал на него — магазин открывается на этих руках). */
+    pedestalAt(x, y, z) { for (const p of this.pedestals) if (Math.hypot(x - p.x, z - p.z) < 135 && Math.abs(y - p.y) < 260) return p; return null; },
     boothAt(x, y, z) { for (const b of this.booths) if (Math.hypot(x - b.x, z - b.z) < b.r && Math.abs(y - b.y) < 220) return b; return null; },
     /** Номер этапа по x (0 — лобби). */
     stageAt(x) { let n = 0; for (const s of this.stages) if (x >= s.x - 50) n = Math.max(n, s.n); return n; },

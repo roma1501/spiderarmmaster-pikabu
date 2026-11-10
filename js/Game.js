@@ -63,6 +63,8 @@ const Game = {
     area: -1,
     dirty: false, saveT: 0, boardT: 0, stepSnd: 0, floatCd: 0, grabSnd: 0,
     lookT: 9, cheer: 0, deadT: 0, tumble: 0, winHome: 0,
+    menuPaused: false,   // открыто меню паузы (окна — GameHud.isOpen): игра стоит, музыка приглушена, но не обрывается
+    /** @type {any} */ inPed: null,
     xpFrac: 0, gripSpent: false,
     /** Реклама за награды: один запрос за раз (adBusy); игра на время ролика не на паузе, поэтому герой «замирает» (adHold): не падает и не теряет хватку. */
     adBusy: false, adHold: false, adHoldT: 0, adHoldGrip: 0, gripOffered: false,
@@ -166,7 +168,7 @@ const Game = {
             const t = /** @type {HTMLElement} */ (e.target);
             const btn = t && t.closest ? t.closest('button, [role="button"]') : null;
             if (!btn || btn.closest('.lory-ctx, .lory-stick')) return;
-            const menuOpen = this.state !== 'play' || Pause.has('manual') || !!this.hud('overlayOpen');
+            const menuOpen = this.state !== 'play' || this.menuPaused || !!this.hud('overlayOpen');
             if (!menuOpen || Platform.adActive) return;
             Platform.interstitial();
         }, true);
@@ -370,23 +372,36 @@ const Game = {
     },
 
     howTo() {
-        if (Pause.has('manual')) this.togglePause();
+        if (this.menuPaused) this.togglePause();
         if (this.state === 'menu') { this.play(true); return; }
         // не прошедший обучение получает перезапуск «по-настоящему» (отметка в сохранении при завершении), прошедший — повтор
         Tutorial.start({ replay: !!this.save.tutorialDone });
     },
 
     togglePause() {
-        if (this.state !== 'play' && !Pause.has('manual')) return;
-        const on = !Pause.has('manual');
+        if (this.state !== 'play' && !this.menuPaused) return;
+        const on = !this.menuPaused;
         if (on) this.hideOffers();
-        Pause.set('manual', on);
+        this.menuPaused = on;
         this.hud('pause', on);
+        this.menuFreeze();
+    },
+
+    /**
+     * Меню паузы и окна останавливают игру сами (Game.update стоит), а не движковой паузой: та глушит весь звук, и музыка
+     * обрывалась при каждом открытии меню (замечание модерации Playgama). Здесь музыка мягко приглушается и возвращается.
+     */
+    menuFreeze() {
+        const frozen = this.menuPaused || !!this.hud('isOpen');
+        if (frozen === !!this._frozen) return;
+        this._frozen = frozen;
+        try { if (frozen) Sound.duck(0.35, 0.3, Infinity); else Sound.unduck(0.5); } catch (e) { /* без звука */ }
+        if (this.state === 'play') Platform.gameplay(!frozen);
     },
 
     windowOpen(open, kind) {
         if (open) this.hideOffers();
-        Pause.set('manual', !!open);
+        this.menuFreeze();
         Input.configure({ controls: !open && this.state === 'play' });
         // примерка: камера подъезжает к герою спереди и держит его в свободной от окна части экрана (shopFrame), после — обратно
         const cam = /** @type {LoryApp} */ (this.app).camera;
@@ -428,7 +443,7 @@ const Game = {
         c.h = h.y + 30 + cp * oy * wp;
     },
 
-    closeWindows() { this.hud('closeShop'); if (Pause.has('manual')) { Pause.set('manual', false); this.hud('pause', false); } Input.configure({ controls: this.state === 'play' }); },
+    closeWindows() { this.hud('closeShop'); if (this.menuPaused) { this.menuPaused = false; this.hud('pause', false); } this.menuFreeze(); Input.configure({ controls: this.state === 'play' }); },
 
     offerDaily() {
         Tutorial.whenIdle(() => {
@@ -605,6 +620,9 @@ const Game = {
 
     update(dt) {
         const app = /** @type {LoryApp} */ (this.app), cam = app.camera, h = this.hero;
+        // меню паузы или окно: мир стоит (камеру примерки ведёт shopFrame в кадровом хуке), звук не обрывается
+        this.menuFreeze();   // сверка каждый кадр: окно могло закрыться само (замена окна, закрытие по фону)
+        if (this.state === 'play' && (this.menuPaused || this.hud('isOpen'))) { Input.consumeLook(); this.syncView(0); return; }
         ObbyCourse.update(dt);
         this.floatCd -= dt;
         // камера всегда следит за героем (панорама движка средней кнопкой или пальцем сбрасывает слежение)
@@ -706,6 +724,10 @@ const Game = {
             this.sfx('open');
         }
         this.inBooth = booth;
+        // пьедестал с руками: встал на него — магазин на этих руках (кнопка «За рекламу N/M» или «Купить»), рука примерена на герое
+        const ped = h.mode === 'walk' ? GameWorld.pedestalAt(h.x, h.feetY(), h.z) : null;
+        if (ped && ped !== this.inPed && !booth) { this.hud('openShop', 'arms', ped.item.id); this.sfx('open'); }
+        this.inPed = ped;
         const portal = h.mode === 'walk' ? GameWorld.portalAt(h.x, h.feetY(), h.z) : null;
         if (portal && portal !== this.inPortal) { this.inPortal = portal; this.teleport(portal.n); }   // inPortal до телепорта: закрытый портал не зовёт его каждый кадр (тост и звук раз за вход)
         else this.inPortal = portal;
@@ -810,7 +832,7 @@ const Game = {
 
     /** Предложение можно показать сейчас: идёт игра — ни обучения, ни окна, ни паузы, ни другой рекламы. */
     canOffer() {
-        return this.state === 'play' && !Tutorial.active && !this.hud('isOpen') && !Pause.has('manual') && this.adOk() && !this.adBusy && !Platform.adActive;
+        return this.state === 'play' && !Tutorial.active && !this.hud('isOpen') && !this.menuPaused && this.adOk() && !this.adBusy && !Platform.adActive;
     },
 
     /** Спрятать все временные предложения (открыто окно или пауза). */

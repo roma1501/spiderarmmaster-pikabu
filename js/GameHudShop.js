@@ -83,6 +83,8 @@ const GAME_WIN_CSS = `
 .card{--rc:#9aa7b8;position:relative;display:flex;flex-direction:column;align-items:center;gap:${samU(4)};padding:${samU(22)} ${samU(7)} ${samU(8)};border-radius:${samU(17)};border:${samU(4)} solid var(--rc);background:linear-gradient(#3a3494,#262069);box-shadow:0 ${samU(4)} 0 rgba(0,0,0,.4),inset 0 0 0 ${samU(2)} rgba(255,255,255,.07);cursor:pointer;touch-action:manipulation;overflow:hidden;-webkit-tap-highlight-color:transparent;transition:transform .12s}
 @media (hover:hover){.card:hover{transform:translateY(${samU(-3)})}}
 .card.sel{box-shadow:0 0 0 ${samU(3)} #fff,0 ${samU(4)} 0 rgba(0,0,0,.4),0 0 ${samU(16)} ${samU(3)} rgba(255,255,255,.5)}
+.card.focus{animation:sam-card-focus .65s ease-in-out 3 alternate}
+@keyframes sam-card-focus{from{transform:scale(1)}to{transform:scale(1.06)}}
 .card .rar{position:absolute;left:0;top:0;box-sizing:border-box;padding:${samU(2)} ${samU(8)} ${samU(2)} ${samU(6)};border-radius:0 0 ${samU(12)} 0;background:var(--rc);border-right:${samU(3)} solid var(--sam-ink);border-bottom:${samU(3)} solid var(--sam-ink);font-size:max(11px,${samU(10.5)});text-transform:uppercase;-webkit-text-stroke:${samU(2.8)} var(--sam-ink);z-index:2;max-width:94%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .card .chk{position:absolute;right:${samU(3)};top:${samU(3)};font-size:${samU(26)};z-index:2}
 .card .ico{position:relative;width:100%;aspect-ratio:1;max-width:${samU(112)};border-radius:${samU(12)};background:radial-gradient(circle at 50% 55%,rgba(255,255,255,.2),rgba(255,255,255,0) 70%)}
@@ -466,9 +468,10 @@ const GameWindows = {
     // Магазин
     // =============================================================================================
 
-    shop(tab) {
+    /** focusId — открыть сразу на предмете (пьедестал в лобби): карточка выбрана, примерена на герое и прокручена в вид. */
+    shop(tab, focusId) {
         if (typeof Shop === 'undefined' || !Shop._items || !Shop._items.length) return;
-        if (this.kind === 'shop') { if (tab) { this._tab = tab; this._renderShop(); } return; }
+        if (this.kind === 'shop') { if (tab) { this._tab = tab; this._renderShop(); } if (focusId) this._focus(focusId); return; }
         const body = this._open('shop', 'ui.shop.title', ['#ffc24a', '#ff8a1c'], true);
         if (!body) return;
         const tabs = Shop.tabs();
@@ -483,6 +486,16 @@ const GameWindows = {
         });
         this._renderShop();
         setTimeout(() => this._fitTabs(), 320);   // окно «выезжает» (масштаб): размеры вкладок точны после анимации
+        if (focusId) this._focus(focusId);
+    },
+
+    _focus(id) {
+        this._select(id);
+        const card = this.body && /** @type {HTMLElement} */ (this.body.querySelector('.card[data-id="' + id + '"]'));
+        if (!card) return;
+        card.classList.add('focus');
+        try { card.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) { card.scrollIntoView(); }
+        setTimeout(() => card.classList.remove('focus'), 2600);
     },
 
     _renderShop() {

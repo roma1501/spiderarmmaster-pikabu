@@ -1229,7 +1229,7 @@ const GameHud = {
     /** Открытое окно в px поля игры: { x, y, w, h, vw, vh, free: { x, y, w, h }, kind } или null (камера магазина ставит героя в центр free). */
     windowRect() { return typeof GameWindows !== 'undefined' ? GameWindows.rect() : null; },
 
-    openShop(tab) { if (typeof GameWindows !== 'undefined') GameWindows.shop(tab); },
+    openShop(tab, focusId) { if (typeof GameWindows !== 'undefined') GameWindows.shop(tab, focusId); },
     /** Закрывает открытое окно любого вида (магазин, подарок, перерождение, телепорт). */
     closeShop() { if (typeof GameWindows !== 'undefined') GameWindows.close(); },
     closeWindow() { this.closeShop(); },

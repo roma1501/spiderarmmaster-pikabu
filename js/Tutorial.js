@@ -766,8 +766,9 @@ const Tutorial = {
             this._uiT = 0.1;
             const el = this._targetEl(st, dev);
             this._highlight(el);
-            this._placePointer(el);
             this._w = this._worldTarget(st, dev);
+            // одна стрелка на элемент и на цель в мире: без элемента её ведёт мир — иначе она гасла раз в 0,1 с и мигала
+            if (el || !this._w) this._placePointer(el);
             if (!this._w) ui.edge.classList.remove('on');
         }
         if (this._w) {
